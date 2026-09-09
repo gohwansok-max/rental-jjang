@@ -5,7 +5,8 @@
 - 누가 씀 : 나만 (고객 개인정보 포함 — 공용 PC 금지, 데이터 파일 커밋 금지)
 - 스택 : 단일 HTML 1파일 (index.html), 외부 라이브러리 없음, 오프라인 동작
 - 데이터 : `localStorage` 키 `rental_intake_v1` — 백업: 헤더의 [백업] 버튼(JSON) → 복원은 [복원]
-- 배포 : GitHub Pages (main 브랜치 / root)
+- 배포 : GitHub Pages (main 브랜치 / root) — PWA(홈 화면 설치·오프라인)
+- 파일 : index.html · manifest.webmanifest · sw.js · icons/ (5개) · .gitignore
 
 ## 먼저 읽을 것
 | 필요한 것 | 위치 |
@@ -13,6 +14,11 @@
 | 카톡 텍스트 파서 | index.html 의 `parseKakao()` |
 | 인식 라벨 규칙 | index.html 의 `RULES` 배열 |
 | 엑셀 열 순서 | index.html 의 `FIELDS` / `LABELS` |
+
+## 새 버전 배포 절차
+1. index.html 수정
+2. **`sw.js` 첫 줄 `const V = "rental-jjang-v4"` 의 숫자를 올린다** (안 올리면 옛 캐시가 남음)
+3. 두 파일을 함께 커밋 → 앱을 완전히 닫았다 다시 열면 반영
 
 ## 건드리면 안 되는 것
 - 저장 키 `rental_intake_v1` (바꾸면 기존 접수 데이터를 못 읽음)
