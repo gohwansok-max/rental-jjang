@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>렌탈 가입신청 접수기</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --line:#e5e7eb; --text:#1f2937; --muted:#6b7280;
+    --accent:#2f6f4f; --accent-weak:#eaf3ee; --danger:#c0392b; --warn:#b7791f;
+    --r:14px; --gap:16px; --shadow:0 1px 3px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:var(--gap); background:var(--bg); color:var(--text);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    font-size:16px; line-height:1.65; -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:840px; margin:0 auto}
+  header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:var(--gap)}
+  h1{font-size:20px; font-weight:700; margin:0}
+  .sub{color:var(--muted); font-size:13px; margin-top:2px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--r);
+        padding:var(--gap); box-shadow:var(--shadow); margin-bottom:var(--gap)}
+  h2{font-size:15px; margin:0 0 10px; font-weight:700}
+  h2 .step{display:inline-block; background:var(--accent-weak); color:var(--accent);
+        border-radius:6px; font-size:12px; padding:1px 7px; margin-right:6px; vertical-align:2px}
+  label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+  input,select,textarea{width:100%; padding:11px 12px; border:1px solid var(--line);
+        border-radius:10px; font:inherit; background:#fff}
+  textarea{min-height:150px; resize:vertical; font-size:14px}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-weak); border-color:var(--accent)}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px}
+  @media(max-width:560px){ .row{grid-template-columns:1fr} }
+  button{padding:11px 16px; border:0; border-radius:10px; font:inherit; font-weight:600;
+        background:var(--accent); color:#fff; cursor:pointer}
+  button.ghost{background:transparent; color:var(--muted); border:1px solid var(--line)}
+  button.danger{background:var(--danger)}
+  button.sm{padding:6px 10px; font-size:13px; font-weight:500}
+  button:active{transform:translateY(1px)}
+  table{width:100%; border-collapse:collapse; font-size:14px}
+  th,td{padding:10px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top}
+  th{color:var(--muted); font-weight:600; font-size:13px}
+  .empty{padding:36px 16px; text-align:center; color:var(--muted); font-size:14px}
+  .err{color:var(--danger); font-size:13px; margin-top:6px; display:none}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+        background:#111; color:#fff; padding:10px 18px; border-radius:999px;
+        font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:9}
+  .toast.on{opacity:.92}
+  .bar{display:flex; gap:8px; flex-wrap:wrap}
+  .note{font-size:12px; color:var(--muted); margin-top:8px}
+  .warn{font-size:12px; color:var(--warn); border:1px solid #f0e2c0; background:#fdf8ec;
+        border-radius:10px; padding:8px 10px; margin-bottom:var(--gap)}
+  .editing{border-color:var(--warn); background:#fffdf6}
+  .cnt{color:var(--muted); font-size:13px; font-weight:400}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>렌탈 가입신청 접수기</h1>
+      <div class="sub">카톡 신청서 붙여넣기 → 자동 채우기 → 엑셀(CSV) 저장</div>
+    </div>
+    <div class="bar">
+      <button class="ghost sm" onclick="exportJSON()">백업</button>
+      <button class="ghost sm" onclick="fileEl.click()">복원</button>
+    </div>
+  </header>
+  <input type="file" id="fileEl" accept="application/json" hidden onchange="importJSON(this)">
+
+  <div class="warn">고객 개인정보가 이 기기의 브라우저에만 저장됩니다. 공용 PC 사용 금지, 저장 데이터(JSON·CSV)는 깃허브 저장소에 올리지 마십시오.</div>
+
+  <!-- 1) 붙여넣기 -->
+  <div class="card">
+    <h2><span class="step">1</span>카톡 내용 붙여넣기</h2>
+    <textarea id="raw" placeholder="단톡방의 신청서 메시지를 그대로 붙여넣으세요.
+▣ 렌탈짱 렌탈가입신청서 ▣
+ ▪브랜드 : LG
+ ▪제품명 : ...
+"></textarea>
+    <div class="bar" style="margin-top:12px">
+      <button onclick="autoFill()">자동 채우기</button>
+      <button class="ghost" onclick="raw.value=''">붙여넣기 칸 비우기</button>
+      <button class="ghost" onclick="copyBlank()">빈 양식 복사</button>
+    </div>
+    <div class="note">값이 라벨 다음 줄에 있어도(예: 성명 → 다음 줄 ": 이광") 인식합니다.</div>
+  </div>
+
+  <!-- 2) 확인·수정 -->
+  <div class="card" id="formCard">
+    <h2><span class="step">2</span>내용 확인 · 수정</h2>
+    <div class="row">
+      <div><label for="brand">브랜드</label><input id="brand" placeholder="LG"></div>
+      <div><label for="product">제품명</label><input id="product" placeholder="LG퓨리케어 빌트인 냉온정수기 WU523AS"></div>
+    </div>
+    <div class="row">
+      <div><label for="color">색상</label><input id="color" placeholder="실버"></div>
+      <div><label for="term">의무사용기간</label>
+        <select id="term">
+          <option value="">선택</option><option>3년</option><option>4년</option><option>5년</option>
+        </select></div>
+    </div>
+    <div class="row">
+      <div><label for="care">관리 방법</label>
+        <select id="care"><option value="">선택</option><option>방문</option><option>셀프</option></select></div>
+      <div><label for="name">성명(사업자명) *</label><input id="name" placeholder="이광">
+        <div class="err" id="eName">성명은 필수입니다</div></div>
+    </div>
+    <div class="row">
+      <div><label for="birth">생년월일(사업자등록번호)</label><input id="birth" inputmode="numeric" placeholder="8107"></div>
+      <div><label for="phone">휴대폰 번호(본인 명의)</label><input id="phone" inputmode="tel" placeholder="0102655"></div>
+    </div>
+    <div class="row">
+      <div><label for="telecom">통신사</label><input id="telecom" placeholder="KT알뜰폰"></div>
+      <div><label for="address">설치 주소</label><input id="address" placeholder="전북 익산시 군익로 1"></div>
+    </div>
+    <div class="row">
+      <div><label for="holder">예금주명</label><input id="holder" placeholder="이광"></div>
+      <div><label for="bank">은행명(카드사명)</label><input id="bank" placeholder="현대카드"></div>
+    </div>
+    <div class="bar">
+      <button id="saveBtn" onclick="saveItem()">목록에 추가</button>
+      <button class="ghost" onclick="clearForm(true)">폼 비우기</button>
+      <button class="ghost" onclick="copyForm()">신청서 문구 복사</button>
+    </div>
+  </div>
+
+  <!-- 3) 목록 -->
+  <div class="card">
+    <h2><span class="step">3</span>접수 목록 <span class="cnt" id="cnt"></span></h2>
+    <div class="bar" style="margin-bottom:12px">
+      <button onclick="exportCSV()">엑셀(CSV) 내려받기</button>
+    </div>
+    <table>
+      <thead><tr><th>접수일</th><th>성명</th><th>제품 / 기간</th><th style="width:110px"></th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="empty">아직 접수된 건이 없습니다. 위에 카톡 내용을 붙여넣고 자동 채우기를 눌러 주세요.</div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── 저장 ─────────────────────────────────────────────── */
+const KEY = "rental_intake_v1";
+const FIELDS = ["brand","product","color","term","care","name","birth","phone","telecom","address","holder","bank"];
+const LABELS = {brand:"브랜드",product:"제품명",color:"색상",term:"의무사용기간",care:"관리방법",
+  name:"성명(사업자명)",birth:"생년월일(사업자등록번호)",phone:"휴대폰번호",telecom:"통신사",
+  address:"설치주소",holder:"예금주명",bank:"은행명(카드사명)"};
+let data = [], editingId = null;
+
+function load(){ try{ data = JSON.parse(localStorage.getItem(KEY)) || [] }catch(e){ data = [] } render() }
+function save(){ localStorage.setItem(KEY, JSON.stringify(data)) }
+
+/* ── 카톡 텍스트 파서 ──────────────────────────────────── */
+const RULES = [
+  ["brand",   /브랜드/],
+  ["product", /제품명|모델명/],
+  ["color",   /색상/],
+  ["term",    /의무사용|사용기간/],
+  ["care",    /관리방법/],
+  ["telecom", /통신사/],
+  ["phone",   /휴대폰번호|연락처|전화번호/],
+  ["name",    /성명|사업자명|고객명/],
+  ["birth",   /생년월일|사업자등록번호/],
+  ["address", /설치주소|주소/],
+  ["holder",  /예금주/],
+  ["bank",    /은행명|카드사/]
+];
+function normLabel(s){ return String(s).replace(/\s+/g,"").replace(/[()（）]/g," ") }
+
+const SECTION = /신청서|고객정보|결제정보|제품정보|기본정보|설치정보/;
+function parseKakao(text){
+  const lines = String(text).replace(/\r/g,"").split("\n");
+  const blocks = [];
+  let open = -1;                                     // 이어붙일 수 있는 블록 위치
+  for(const rawLine of lines){
+    const line = rawLine.replace(/[▣▪▫◾◽·•■□◆●○*]/g," ").trim();
+    if(!line) continue;
+    if(line.indexOf(":") === -1 && (/[▣■]/.test(rawLine) || SECTION.test(normLabel(line)))){
+      open = -1; continue;                           // 섹션 제목 줄은 버린다
+    }
+    if(line.startsWith(":") && open > -1){           // 값이 다음 줄에 있는 경우
+      blocks[open] += " " + line; continue;
+    }
+    if(line.indexOf(":") === -1 && open > -1 && blocks[open].indexOf(":") > -1 && !isLabelish(line)){
+      blocks[open] += " " + line; continue;           // 주소 등 줄바꿈 이어붙이기
+    }
+    blocks.push(line); open = blocks.length - 1;
+  }
+  const out = {};
+  for(const b of blocks){
+    const i = b.indexOf(":");
+    if(i === -1) continue;
+    const label = normLabel(b.slice(0, i));
+    let value = b.slice(i + 1).replace(/\s+/g," ").trim();
+    if(!value) continue;
+    for(const [key, re] of RULES){
+      if(re.test(label)){ if(!out[key]) out[key] = value; break; }
+    }
+  }
+  return out;
+}
+function isLabelish(line){
+  const n = normLabel(line);
+  return RULES.some(([,re]) => re.test(n));
+}
+
+/* ── 동작 ─────────────────────────────────────────────── */
+function autoFill(){
+  const t = raw.value.trim();
+  if(!t){ toastMsg("붙여넣은 내용이 없습니다"); return }
+  const p = parseKakao(t);
+  const got = Object.keys(p).length;
+  if(!got){ toastMsg("인식된 항목이 없습니다. 직접 입력해 주세요"); return }
+  for(const f of FIELDS){ if(p[f] !== undefined) setVal(f, p[f]) }
+  eName.style.display = "none";
+  toastMsg(got + "개 항목을 채웠습니다");
+  formCard.scrollIntoView({behavior:"smooth", block:"start"});
+}
+function setVal(id, v){
+  const el = document.getElementById(id);
+  if(el.tagName === "SELECT"){
+    const hit = [...el.options].find(o => o.value && v.includes(o.value.replace("년","")));
+    el.value = hit ? hit.value : "";
+    if(!hit && v) el.insertAdjacentHTML("beforeend", `<option selected>${esc(v)}</option>`);
+  }else{
+    el.value = v;
+  }
+}
+function readForm(){
+  const o = {};
+  for(const f of FIELDS) o[f] = document.getElementById(f).value.trim();
+  return o;
+}
+function saveItem(){
+  const o = readForm();
+  eName.style.display = o.name ? "none" : "block";
+  if(!o.name) return;
+  if(editingId){
+    const i = data.findIndex(d => d.id === editingId);
+    if(i > -1) data[i] = Object.assign({}, data[i], o);
+    toastMsg("수정했습니다");
+  }else{
+    data.unshift(Object.assign({id:Date.now(), at:new Date().toISOString()}, o));
+    toastMsg("접수 목록에 추가했습니다");
+  }
+  clearForm(false); raw.value = ""; save(); render();
+}
+function clearForm(msg){
+  for(const f of FIELDS) document.getElementById(f).value = "";
+  editingId = null; eName.style.display = "none";
+  saveBtn.textContent = "목록에 추가"; formCard.classList.remove("editing");
+  if(msg) toastMsg("폼을 비웠습니다");
+}
+function editItem(id){
+  const d = data.find(x => x.id === id); if(!d) return;
+  for(const f of FIELDS) setVal(f, d[f] ?? "");
+  editingId = id; saveBtn.textContent = "수정 저장"; formCard.classList.add("editing");
+  formCard.scrollIntoView({behavior:"smooth", block:"start"});
+  toastMsg("수정 모드입니다");
+}
+function delItem(id){
+  if(!confirm("이 접수 건을 삭제하시겠습니까? 되돌릴 수 없습니다.")) return;
+  data = data.filter(d => d.id !== id);
+  if(editingId === id) clearForm(false);
+  save(); render(); toastMsg("삭제했습니다");
+}
+
+/* ── 표시 ─────────────────────────────────────────────── */
+function render(){
+  tbody.innerHTML = data.map(d => `
+    <tr>
+      <td>${esc((d.at ?? "").slice(0,10) || "—")}</td>
+      <td>${esc(d.name ?? "—")}<div class="sub">${esc(d.phone ?? "—")}</div></td>
+      <td>${esc(d.product ?? "—")}<div class="sub">${esc(d.term ?? "—")} · ${esc(d.care ?? "—")}</div></td>
+      <td class="bar">
+        <button class="ghost sm" onclick="editItem(${d.id})">수정</button>
+        <button class="ghost sm" onclick="delItem(${d.id})">삭제</button>
+      </td>
+    </tr>`).join("");
+  empty.style.display = data.length ? "none" : "block";
+  cnt.textContent = data.length ? "총 " + data.length + "건" : "";
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) }
+function toastMsg(m){ toast.textContent = m; toast.classList.add("on"); setTimeout(()=>toast.classList.remove("on"), 1500) }
+
+/* ── 카톡 문구 만들기 ─────────────────────────────────── */
+function buildText(o){
+  return [
+    "▣ 렌탈짱 렌탈가입신청서 ▣",
+    "  ▪브랜드 : " + (o.brand || ""),
+    "  ▪제품명 : " + (o.product || ""),
+    "  ▪색   상 : " + (o.color || ""),
+    "  ▪의무사용기간(3,4,5년) : " + (o.term || ""),
+    "  ▪관리  방법 (방문/셀프) : " + (o.care || ""),
+    "",
+    "▣ 고객정보 ▣",
+    "  ▪ 성명(사업자명)",
+    "      : " + (o.name || ""),
+    "  ▪ 생년월일(사업자등록번호)",
+    "      : " + (o.birth || ""),
+    "  ▪ 휴대폰 번호(본인 명의)",
+    "      : " + (o.phone || ""),
+    "  ▪ 휴대폰 통신사(본인 명의)",
+    "      : " + (o.telecom || ""),
+    "  ▪ 설치 주소",
+    "      : " + (o.address || ""),
+    "",
+    "▣ 결제정보 ▣",
+    "  ▪ 예금주명",
+    "      : " + (o.holder || ""),
+    "  ▪ 은행명(카드사명)",
+    "      : " + (o.bank || "")
+  ].join("\n");
+}
+function copyForm(){ copyText(buildText(readForm()), "신청서 문구를 복사했습니다") }
+function copyBlank(){ copyText(buildText({}), "빈 양식을 복사했습니다") }
+function copyText(t, msg){
+  const done = () => toastMsg(msg);
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(t).then(done, () => fallbackCopy(t, done));
+  }else{ fallbackCopy(t, done) }
+}
+function fallbackCopy(t, done){
+  const ta = document.createElement("textarea");
+  ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); done() }catch(e){ alert("복사에 실패했습니다. 직접 선택해 복사해 주세요.\n\n" + t) }
+  document.body.removeChild(ta);
+}
+
+/* ── 내보내기 / 가져오기 ──────────────────────────────── */
+function download(blob, filename){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function csvCell(v){ return '"' + String(v ?? "").replace(/"/g,'""') + '"' }
+function exportCSV(){
+  if(!data.length){ toastMsg("내려받을 접수 건이 없습니다"); return }
+  const head = ["접수일시"].concat(FIELDS.map(f => LABELS[f]));
+  const rows = data.map(d => [ (d.at ?? "").replace("T"," ").slice(0,16) ]
+    .concat(FIELDS.map(f => d[f] ?? "")));
+  const csv = "\uFEFF" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n");
+  download(new Blob([csv], {type:"text/csv;charset=utf-8;"}),
+           "렌탈접수_" + new Date().toISOString().slice(0,10) + ".csv");
+  toastMsg("엑셀 파일을 내려받았습니다");
+}
+function exportJSON(){
+  const blob = new Blob([JSON.stringify({key:KEY, at:new Date().toISOString(), data}, null, 2)], {type:"application/json"});
+  download(blob, KEY + "_" + new Date().toISOString().slice(0,10) + ".json");
+}
+function importJSON(el){
+  const f = el.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const j = JSON.parse(r.result);
+      if(!Array.isArray(j.data)) throw 0;
+      if(!confirm("현재 저장된 접수 목록을 덮어씁니다. 진행할까요?")) { el.value=""; return }
+      data = j.data; save(); render(); toastMsg("복원했습니다");
+    }catch(e){ alert("파일 형식이 올바르지 않습니다.") }
+    el.value = "";
+  };
+  r.readAsText(f);
+}
+
+load();
+</script>
+</body>
+</html>
